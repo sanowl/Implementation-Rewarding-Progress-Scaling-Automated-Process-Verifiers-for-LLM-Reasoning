@@ -237,26 +237,3 @@ Establishing theoretical bounds on policy improvement provides assurance that th
 
 Empirical validation should be conducted to verify that the inequality holds under practical training scenarios. Additionally, further theoretical work may be required to tighten the bounds or relax the assumptions as needed.
 
----
-
-### **General Recommendations Across All Add-ons**
-
-1. **Consistency in Notation:**
-   - Ensure all symbols and terms are consistently defined and used throughout the formulations to avoid confusion and misinterpretation.
-
-2. **Clear Definitions:**
-   - Explicitly define all functions, distributions, and hyperparameters involved in the formulations to provide a comprehensive understanding.
-
-3. **Theoretical Justification:**
-   - Accompany mathematical formulations with theoretical derivations or references to established results to substantiate their validity.
-
-4. **Dimensional and Logical Consistency:**
-   - Verify that all equations are dimensionally consistent and logically sound, ensuring that each term contributes meaningfully to the overall objective.
-
-5. **Simplification and Clarity:**
-   - Avoid unnecessary complexity in mathematical expressions. Clear and concise formulations facilitate easier implementation and analysis.
-
-6. **Empirical Validation:**
-   - Complement theoretical formulations with empirical experiments to validate their effectiveness and identify potential areas for refinement.
-
----

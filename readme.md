@@ -92,8 +92,6 @@ $$\text{beam}_t = \text{top-k}_{a} \{(s, a, R_{\text{effective}}(s, a)) | s \in 
 This implementation attempts to capture the key ideas from "Rewarding Progress: Scaling Automated Process Verifiers for LLM Reasoning". While it may not be an exact replication, it provides a foundation for exploring the concepts of Process Advantage Verifiers and their potential for improving reasoning in LLMs. Further refinement and comparison with the original paper may be necessary to fully realize the potential of this approach.
 
 
----
-
 ## Missing Add-ons
 
 ### 1. **Dynamic Prover Updates**
@@ -104,19 +102,14 @@ To maintain complementarity between the base policy \( \pi_t \) and the prover p
 
 Let \( \rho(s) \) denote the state distribution. The update rule for the prover policy \( \mu_{t+1} \) at training iteration \( t+1 \) is defined as:
 
-\[
-\mu_{t+1} = \arg\max_{\mu} \left[ \mathbb{E}_{s \sim \rho} \left[ \mathbb{V}_{a \sim \pi_t(a|s)} \left[ A_{\mu}(s, a) \right] \right] - \lambda \cdot \text{Similarity}(\mu, \pi_t) \right]
-\]
+$$
+\mu_{t+1} = \arg\max_{\mu} \left[ \mathbb{E}_{s \sim \rho} \left[ \mathbb{V}_{a \sim \pi_t(a|s)} \left[ A_{\mu}(s, a) \right] \right] - \lambda \cdot \text{KL}(\mu(a|s) \| \pi_t(a|s)) \right]
+$$
 
 **Where:**
 
 - \( \mathbb{V}_{a \sim \pi_t(a|s)} \left[ A_{\mu}(s, a) \right] \) represents the variance of the advantage function under the base policy \( \pi_t \), encouraging diversity in the prover's assessments.
-- \( \text{Similarity}(\mu, \pi_t) \) is a measure of similarity between the prover policy \( \mu \) and the base policy \( \pi_t \), such as the Kullback-Leibler (KL) divergence:
-  
-  \[
-  \text{Similarity}(\mu, \pi_t) = \text{KL}(\mu(a|s) \| \pi_t(a|s))
-  \]
-  
+- \( \text{KL}(\mu(a|s) \| \pi_t(a|s)) \) is the Kullback-Leibler divergence measuring the similarity between the prover policy \( \mu \) and the base policy \( \pi_t \).
 - \( \lambda \) is a hyperparameter that balances the trade-off between maximizing variance (diversity) and minimizing similarity (ensuring complementarity).
 
 **Explanation:**
@@ -132,9 +125,9 @@ Formulating the prover design as a two-player game allows simultaneous optimizat
 
 **Revised Formulation:**
 
-\[
+$$
 \min_{\pi} \max_{\mu} \mathcal{L}(\pi, \mu) = \mathbb{E}_{s \sim \rho} \left[ V_{\pi}(s) \right] + \alpha \cdot \mathbb{E}_{s \sim \rho} \left[ \mathbb{V}_{a \sim \pi(a|s)} \left[ A_{\mu}(s, a) \right] - \beta \cdot \left( \mathbb{E}_{a \sim \pi(a|s)} \left[ A_{\mu}(s, a) A_{\pi}(s, a) \right] \right)^2 \right]
-\]
+$$
 
 **Where:**
 
@@ -148,7 +141,7 @@ Formulating the prover design as a two-player game allows simultaneous optimizat
 - **Objective for \( \mu \):** The prover \( \mu \) aims to maximize the variance of its advantage estimates while minimizing the squared covariance with the base policy's advantages. This encourages \( \mu \) to provide diverse and complementary feedback.
   
 - **Objective for \( \pi \):** The base policy \( \pi \) seeks to minimize the loss function, which includes maximizing its own value function and accounting for the prover's feedback.
-
+  
 - **Squared Covariance Term:** Squaring the expectation ensures differentiability and penalizes significant misalignments between \( A_{\mu} \) and \( A_{\pi} \), promoting meaningful complementarity.
 
 **Note:** The minimax optimization ensures that \( \pi \) and \( \mu \) evolve in a balanced manner, with \( \mu \) continuously challenging \( \pi \) to enhance reasoning capabilities.
@@ -161,9 +154,9 @@ Estimating the advantage function using Monte Carlo rollouts provides a more acc
 
 **Revised Formulation:**
 
-\[
+$$
 \hat{A}_{\mu}(s, a) = \frac{1}{N} \sum_{i=1}^{N} \left[ \sum_{t=0}^{T} \gamma^t R(s_t, a_t) - V_{\pi}(s_0) \right]
-\]
+$$
 
 **Where:**
 
@@ -178,7 +171,7 @@ Estimating the advantage function using Monte Carlo rollouts provides a more acc
 - **Rollout Process:** For each rollout \( i \), starting from state \( s_0 \), an action \( a_0 \) is taken according to the base policy \( \pi \). Subsequent actions are determined by the prover policy \( \mu \), allowing the prover to influence the trajectory.
   
 - **Cumulative Reward:** The sum \( \sum_{t=0}^{T} \gamma^t R(s_t, a_t) \) represents the discounted cumulative reward for the rollout, capturing the long-term consequences of the initial action \( a_0 \).
-
+  
 - **Advantage Estimate:** Subtracting \( V_{\pi}(s_0) \) provides an estimate of the advantage of taking action \( a_0 \) in state \( s_0 \), considering the prover's influence on future actions.
 
 **Consistency in Sampling:**
@@ -193,9 +186,9 @@ Establishing theoretical bounds on policy improvement provides assurance that th
 
 **Revised Formulation:**
 
-\[
+$$
 \mathbb{E}_{s \sim \rho} \left[ V_{\pi_{t+1}}(s) - V_{\pi_t}(s) \right] \geq \gamma \left( \mathbb{E}_{s \sim \rho} \mathbb{V}_{a \sim \pi_t(a|s)} \left[ A_{\mu}(s, a) \right] + \beta \cdot \mathbb{E}_{s \sim \rho} \mathbb{E}_{a \sim \pi_t(a|s)} \left[ A_{\mu}(s, a) A_{\pi_t}(s, a) \right] \right)
-\]
+$$
 
 **Where:**
 
@@ -208,8 +201,8 @@ Establishing theoretical bounds on policy improvement provides assurance that th
 **Assumptions:**
 
 1. **Bounded Advantage Functions:**
-   - \( |A_{\mu}(s, a)| \leq A_{\max} \) for all \( s, a \).
-   - \( |A_{\pi_t}(s, a)| \leq A_{\max} \) for all \( s, a \).
+   - \( |A_{\mu}(s, a)| \leq A_{\text{max}} \) for all \( s, a \).
+   - \( |A_{\pi_t}(s, a)| \leq A_{\text{max}} \) for all \( s, a \).
 
 2. **Smoothness of Policies:**
    - Policies \( \pi_t \) and \( \mu \) are sufficiently smooth to allow for gradient-based optimization.
@@ -232,8 +225,4 @@ Establishing theoretical bounds on policy improvement provides assurance that th
 - **Positive Variance Contribution:** Encourages exploration and exploitation of diverse actions, leading to more robust policy updates.
   
 - **Covariance Influence:** Balances the prover's feedback to ensure that it complements rather than contradicts the base policy, fostering coherent policy improvement.
-
-**Verification:**
-
-Empirical validation should be conducted to verify that the inequality holds under practical training scenarios. Additionally, further theoretical work may be required to tighten the bounds or relax the assumptions as needed.
 

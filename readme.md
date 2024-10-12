@@ -91,36 +91,172 @@ $$\text{beam}_t = \text{top-k}_{a} \{(s, a, R_{\text{effective}}(s, a)) | s \in 
 
 This implementation attempts to capture the key ideas from "Rewarding Progress: Scaling Automated Process Verifiers for LLM Reasoning". While it may not be an exact replication, it provides a foundation for exploring the concepts of Process Advantage Verifiers and their potential for improving reasoning in LLMs. Further refinement and comparison with the original paper may be necessary to fully realize the potential of this approach.
 
+
+---
+
 ## Missing Add-ons
 
-1. **Dynamic Prover Updates**:
+### 1. **Dynamic Prover Updates**
 
-   Let $\pi_t$ be the base policy and $\mu_t$ be the prover policy at training iteration $t$. The goal is to update $\mu_t$ dynamically to maintain its complementarity to $\pi_t$. One approach could be:
+To maintain complementarity between the base policy \( \pi_t \) and the prover policies \( \mu_t \), it is essential to update the prover policies dynamically during training. The objective is to ensure that prover policies provide diverse and constructive feedback without overshadowing the base policy.
 
-   $\mu_{t+1} = \arg\max_{\mu} \left[ \mathbb{E}_{s\sim\rho} \mathbb{V}_{a\sim\pi_t} [A_\mu(s,a)] + \lambda \mathbb{E}_{s\sim\rho, a\sim\pi_t} [A_\mu(s,a)A_{\pi_t}(s,a)] \right]$
+**Revised Formulation:**
 
-   where $\lambda$ balances between distinguishability and alignment. This optimization problem could be solved periodically during training to update the prover.
+Let \( \rho(s) \) denote the state distribution. The update rule for the prover policy \( \mu_{t+1} \) at training iteration \( t+1 \) is defined as:
 
-2. **Optimal Prover Design**:
+\[
+\mu_{t+1} = \arg\max_{\mu} \left[ \mathbb{E}_{s \sim \rho} \left[ \mathbb{V}_{a \sim \pi_t(a|s)} \left[ A_{\mu}(s, a) \right] \right] - \lambda \cdot \text{Similarity}(\mu, \pi_t) \right]
+\]
 
-   This can be formulated as a two-player game:
+**Where:**
 
-   $\min_{\pi} \max_{\mu} \mathcal{L}(\pi, \mu) = \mathbb{E}_{s\sim\rho} [V_\pi(s)] + \alpha \cdot \mathbb{E}_{s\sim\rho} \left[ \mathbb{V}_{a\sim\pi} [A_\mu(s,a)] - \beta \cdot |\mathbb{E}_{a\sim\pi} [A_\mu(s,a)A_\pi(s,a)]| \right]$
+- \( \mathbb{V}_{a \sim \pi_t(a|s)} \left[ A_{\mu}(s, a) \right] \) represents the variance of the advantage function under the base policy \( \pi_t \), encouraging diversity in the prover's assessments.
+- \( \text{Similarity}(\mu, \pi_t) \) is a measure of similarity between the prover policy \( \mu \) and the base policy \( \pi_t \), such as the Kullback-Leibler (KL) divergence:
+  
+  \[
+  \text{Similarity}(\mu, \pi_t) = \text{KL}(\mu(a|s) \| \pi_t(a|s))
+  \]
+  
+- \( \lambda \) is a hyperparameter that balances the trade-off between maximizing variance (diversity) and minimizing similarity (ensuring complementarity).
 
-   Here, $\alpha$ and $\beta$ are hyperparameters. This formulation encourages high performance of $\pi$ while also promoting a complementary $\mu$ (high variance of $A_\mu$ under $\pi$, with some alignment).
+**Explanation:**
 
-3. **Rollout-Based Advantage Estimation**:
+- **Maximizing Variance:** Encourages the prover policy to explore different actions that the base policy might not prioritize, fostering diverse feedback.
+- **Minimizing Similarity:** Ensures that the prover policy does not become too similar to the base policy, maintaining its role as a complementary verifier.
 
-   Instead of training a PAV, $A_\mu(s,a)$ could be estimated directly using Monte Carlo rollouts:
+---
 
-   $\hat{A}_\mu(s,a) = \frac{1}{N} \sum_{i=1}^N \left[ R(s,a,\mu_i) - \frac{1}{M} \sum_{j=1}^M R(s,\mu_j) \right]$
+### 2. **Optimal Prover Design**
 
-   where $R(s,a,\mu_i)$ is the return from state $s$, taking action $a$ and then following prover $\mu$ for $i$-th rollout, and $R(s,\mu_j)$ is the return from state $s$ following $\mu$ for $j$-th rollout.
+Formulating the prover design as a two-player game allows simultaneous optimization of the base policy \( \pi \) and the prover policy \( \mu \). This adversarial setup ensures that the prover continuously challenges the base policy, promoting robust reasoning capabilities.
 
-4. **Theoretical Guarantees**:
+**Revised Formulation:**
 
-   Further investigation of the lower bound on policy improvement from Theorem 3.1 is needed:
+\[
+\min_{\pi} \max_{\mu} \mathcal{L}(\pi, \mu) = \mathbb{E}_{s \sim \rho} \left[ V_{\pi}(s) \right] + \alpha \cdot \mathbb{E}_{s \sim \rho} \left[ \mathbb{V}_{a \sim \pi(a|s)} \left[ A_{\mu}(s, a) \right] - \beta \cdot \left( \mathbb{E}_{a \sim \pi(a|s)} \left[ A_{\mu}(s, a) A_{\pi}(s, a) \right] \right)^2 \right]
+\]
 
-   $\mathbb{E}_{s\sim\rho} [V_{\pi_{t+1}}(s) - V_{\pi_t}(s)] \gtrsim \gamma \cdot \mathbb{E}_{s\sim\rho} \left[ \mathbb{V}_{a\sim\pi_t} [A_\mu(s,a)] + \mathbb{E}_{a\sim\pi_t} [A_\mu(s,a)A_{\pi_t}(s,a)] \right]$
+**Where:**
 
-   Empirical validation of this bound and exploration of tighter bounds under specific conditions could be conducted. Exploration into how different prover designs affect the terms in this bound, particularly the variance term $\mathbb{V}_{a\sim\pi_t} [A_\mu(s,a)]$ and the alignment term $\mathbb{E}_{a\sim\pi_t} [A_\mu(s,a)A_{\pi_t}(s,a)]$, would be valuable.
+- \( V_{\pi}(s) \) is the value function under the base policy \( \pi \).
+- \( A_{\mu}(s, a) \) is the advantage function under the prover policy \( \mu \).
+- \( A_{\pi}(s, a) \) is the advantage function under the base policy \( \pi \).
+- \( \alpha \) and \( \beta \) are hyperparameters that balance the contributions of variance and covariance terms.
+
+**Explanation:**
+
+- **Objective for \( \mu \):** The prover \( \mu \) aims to maximize the variance of its advantage estimates while minimizing the squared covariance with the base policy's advantages. This encourages \( \mu \) to provide diverse and complementary feedback.
+  
+- **Objective for \( \pi \):** The base policy \( \pi \) seeks to minimize the loss function, which includes maximizing its own value function and accounting for the prover's feedback.
+
+- **Squared Covariance Term:** Squaring the expectation ensures differentiability and penalizes significant misalignments between \( A_{\mu} \) and \( A_{\pi} \), promoting meaningful complementarity.
+
+**Note:** The minimax optimization ensures that \( \pi \) and \( \mu \) evolve in a balanced manner, with \( \mu \) continuously challenging \( \pi \) to enhance reasoning capabilities.
+
+---
+
+### 3. **Rollout-Based Advantage Estimation**
+
+Estimating the advantage function using Monte Carlo rollouts provides a more accurate and context-aware assessment of actions, leveraging the prover policies to evaluate the consequences of actions taken by the base policy.
+
+**Revised Formulation:**
+
+\[
+\hat{A}_{\mu}(s, a) = \frac{1}{N} \sum_{i=1}^{N} \left[ \sum_{t=0}^{T} \gamma^t R(s_t, a_t) - V_{\pi}(s_0) \right]
+\]
+
+**Where:**
+
+- \( N \) is the number of rollout samples.
+- \( T \) is the horizon length for each rollout.
+- \( \gamma \) is the discount factor.
+- \( R(s_t, a_t) \) is the reward received at time step \( t \).
+- \( V_{\pi}(s_0) \) is the value function estimate at the initial state \( s_0 \).
+
+**Explanation:**
+
+- **Rollout Process:** For each rollout \( i \), starting from state \( s_0 \), an action \( a_0 \) is taken according to the base policy \( \pi \). Subsequent actions are determined by the prover policy \( \mu \), allowing the prover to influence the trajectory.
+  
+- **Cumulative Reward:** The sum \( \sum_{t=0}^{T} \gamma^t R(s_t, a_t) \) represents the discounted cumulative reward for the rollout, capturing the long-term consequences of the initial action \( a_0 \).
+
+- **Advantage Estimate:** Subtracting \( V_{\pi}(s_0) \) provides an estimate of the advantage of taking action \( a_0 \) in state \( s_0 \), considering the prover's influence on future actions.
+
+**Consistency in Sampling:**
+
+Ensure that the number of prover policies \( N \) and the horizon \( T \) are consistently defined across rollouts to avoid bias in advantage estimation.
+
+---
+
+### 4. **Theoretical Guarantees**
+
+Establishing theoretical bounds on policy improvement provides assurance that the learning process leads to meaningful enhancements in the base policy's performance. Below is a refined formulation that articulates a lower bound on the expected improvement of the value function based on the statistical properties of the advantage functions.
+
+**Revised Formulation:**
+
+\[
+\mathbb{E}_{s \sim \rho} \left[ V_{\pi_{t+1}}(s) - V_{\pi_t}(s) \right] \geq \gamma \left( \mathbb{E}_{s \sim \rho} \mathbb{V}_{a \sim \pi_t(a|s)} \left[ A_{\mu}(s, a) \right] + \beta \cdot \mathbb{E}_{s \sim \rho} \mathbb{E}_{a \sim \pi_t(a|s)} \left[ A_{\mu}(s, a) A_{\pi_t}(s, a) \right] \right)
+\]
+
+**Where:**
+
+- \( \gamma \in (0, 1) \) is the discount factor.
+- \( \beta \geq 0 \) is a hyperparameter balancing the covariance term.
+- \( \rho(s) \) is the state distribution under the base policy \( \pi_t \).
+- \( V_{\pi}(s) \) is the value function under policy \( \pi \).
+- \( A_{\mu}(s, a) \) and \( A_{\pi_t}(s, a) \) are the advantage functions under policies \( \mu \) and \( \pi_t \), respectively.
+
+**Assumptions:**
+
+1. **Bounded Advantage Functions:**
+   - \( |A_{\mu}(s, a)| \leq A_{\max} \) for all \( s, a \).
+   - \( |A_{\pi_t}(s, a)| \leq A_{\max} \) for all \( s, a \).
+
+2. **Smoothness of Policies:**
+   - Policies \( \pi_t \) and \( \mu \) are sufficiently smooth to allow for gradient-based optimization.
+
+3. **Stationary State Distribution:**
+   - The state distribution \( \rho(s) \) remains approximately stationary during the policy update from \( \pi_t \) to \( \pi_{t+1} \).
+
+**Explanation:**
+
+- **Expected Improvement:** The left-hand side \( \mathbb{E}_{s \sim \rho} [ V_{\pi_{t+1}}(s) - V_{\pi_t}(s) ] \) quantifies the expected improvement in the value function after updating the base policy from \( \pi_t \) to \( \pi_{t+1} \).
+
+- **Variance Term:** \( \mathbb{V}_{a \sim \pi_t(a|s)} [ A_{\mu}(s, a) ] \) captures the variability in the advantage estimates provided by the prover. Higher variance indicates that the prover is effectively distinguishing between good and bad actions, providing informative feedback for policy improvement.
+
+- **Covariance Term:** \( \mathbb{E}_{s \sim \rho} \mathbb{E}_{a \sim \pi_t(a|s)} [ A_{\mu}(s, a) A_{\pi_t}(s, a) ] \) measures the alignment between the prover's advantages and the base policy's advantages. A positive covariance implies that the prover is reinforcing the base policy's strengths, while a negative covariance would indicate areas for improvement.
+
+- **Lower Bound:** The inequality asserts that the expected improvement in the value function is bounded below by a combination of the variance and covariance of the advantage functions, scaled by the discount factor \( \gamma \) and the hyperparameter \( \beta \).
+
+**Implications:**
+
+- **Positive Variance Contribution:** Encourages exploration and exploitation of diverse actions, leading to more robust policy updates.
+  
+- **Covariance Influence:** Balances the prover's feedback to ensure that it complements rather than contradicts the base policy, fostering coherent policy improvement.
+
+**Verification:**
+
+Empirical validation should be conducted to verify that the inequality holds under practical training scenarios. Additionally, further theoretical work may be required to tighten the bounds or relax the assumptions as needed.
+
+---
+
+### **General Recommendations Across All Add-ons**
+
+1. **Consistency in Notation:**
+   - Ensure all symbols and terms are consistently defined and used throughout the formulations to avoid confusion and misinterpretation.
+
+2. **Clear Definitions:**
+   - Explicitly define all functions, distributions, and hyperparameters involved in the formulations to provide a comprehensive understanding.
+
+3. **Theoretical Justification:**
+   - Accompany mathematical formulations with theoretical derivations or references to established results to substantiate their validity.
+
+4. **Dimensional and Logical Consistency:**
+   - Verify that all equations are dimensionally consistent and logically sound, ensuring that each term contributes meaningfully to the overall objective.
+
+5. **Simplification and Clarity:**
+   - Avoid unnecessary complexity in mathematical expressions. Clear and concise formulations facilitate easier implementation and analysis.
+
+6. **Empirical Validation:**
+   - Complement theoretical formulations with empirical experiments to validate their effectiveness and identify potential areas for refinement.
+
+---

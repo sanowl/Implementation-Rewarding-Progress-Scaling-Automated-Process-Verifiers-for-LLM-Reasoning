@@ -99,40 +99,40 @@ In platforms that support LaTeX, like Jupyter Notebooks or certain Markdown-rend
 
 Since this environment doesn't support rendering LaTeX directly, here's a plain-text version of your equations and content that can still be useful for code or textual explanation:
 
----
-
 ## Missing Add-ons
 
-### 1. Dynamic Prover Updates:
-Let `π_t` be the base policy and `μ_t` be the prover policy at training iteration `t`. The goal is to update `μ_t` dynamically to maintain its complementarity to `π_t`. One approach could be:
+1. Dynamic Prover Updates:
+   Let $\pi_t$ be the base policy and $\mu_t$ be the prover policy at training iteration $t$. The goal is to update $\mu_t$ dynamically to maintain its complementarity to $\pi_t$. One approach could be:
 
-`μ_{t+1} = argmax_μ [ E_{s∼ρ} Var_{a∼π_t} [A_μ(s,a)] + λ * E_{s∼ρ, a∼π_t} [A_μ(s,a) A_π_t(s,a)] ]`
+   $$
+   \mu_{t+1} = \arg\max_{\mu} \left[ \mathbb{E}_{s\sim\rho} \mathbb{V}_{a\sim\pi_t} [A_\mu(s,a)] + \lambda \mathbb{E}_{s\sim\rho, a\sim\pi_t} [A_\mu(s,a)A_{\pi_t}(s,a)] \right]
+   $$
 
-Where `λ` balances between distinguishability and alignment. This optimization problem could be solved periodically during training to update the prover.
+   where $\lambda$ balances between distinguishability and alignment. This optimization problem could be solved periodically during training to update the prover.
 
----
+2. Optimal Prover Design:
+   This can be formulated as a two-player game:
 
-### 2. Optimal Prover Design:
-This can be formulated as a two-player game:
+   $$
+   \min_{\pi} \max_{\mu} \mathcal{L}(\pi, \mu) = \mathbb{E}_{s\sim\rho} [V_\pi(s)] + \alpha \cdot \mathbb{E}_{s\sim\rho} \left[ \mathbb{V}_{a\sim\pi} [A_\mu(s,a)] - \beta \cdot |\mathbb{E}_{a\sim\pi} [A_\mu(s,a)A_\pi(s,a)]| \right]
+   $$
 
-`min_π max_μ L(π, μ) = E_{s∼ρ} [V_π(s)] + α * E_{s∼ρ} [Var_{a∼π} [A_μ(s,a)] - β * |E_{a∼π} [A_μ(s,a) A_π(s,a)]| ]`
+   Here, $\alpha$ and $\beta$ are hyperparameters. This formulation encourages high performance of $\pi$ while also promoting a complementary $\mu$ (high variance of $A_\mu$ under $\pi$, with some alignment).
 
-Here, `α` and `β` are hyperparameters. This formulation encourages high performance of `π` while also promoting a complementary `μ` (high variance of `A_μ` under `π`, with some alignment).
+3. Rollout-Based Advantage Estimation:
+   Instead of training a PAV, $A_\mu(s,a)$ could be estimated directly using Monte Carlo rollouts:
 
----
+   $$
+   \hat{A}_\mu(s,a) = \frac{1}{N} \sum_{i=1}^N \left[ R(s,a,\mu_i) - \frac{1}{M} \sum_{j=1}^M R(s,\mu_j) \right]
+   $$
 
-### 3. Rollout-Based Advantage Estimation:
-Instead of training a PAV, `A_μ(s,a)` could be estimated directly using Monte Carlo rollouts:
+   where $R(s,a,\mu_i)$ is the return from state $s$, taking action $a$ and then following prover $\mu$ for $i$-th rollout, and $R(s,\mu_j)$ is the return from state $s$ following $\mu$ for $j$-th rollout.
 
-`A_μ(s,a) ≈ (1/N) Σ_{i=1}^N [ R(s,a,μ_i) - (1/M) Σ_{j=1}^M R(s,μ_j) ]`
+4. Theoretical Guarantees:
+   Further investigation of the lower bound on policy improvement from Theorem 3.1 is needed:
 
-Where `R(s,a,μ_i)` is the return from state `s`, taking action `a` and then following prover `μ` for the `i`-th rollout, and `R(s,μ_j)` is the return from state `s` following `μ` for the `j`-th rollout.
+   $$
+   \mathbb{E}_{s\sim\rho} [V_{\pi_{t+1}}(s) - V_{\pi_t}(s)] \gtrsim \gamma \cdot \mathbb{E}_{s\sim\rho} \left[ \mathbb{V}_{a\sim\pi_t} [A_\mu(s,a)] + \mathbb{E}_{a\sim\pi_t} [A_\mu(s,a)A_{\pi_t}(s,a)] \right]
+   $$
 
----
-
-### 4. Theoretical Guarantees:
-Further investigation of the lower bound on policy improvement from Theorem 3.1 is needed:
-
-`E_{s∼ρ} [V_{π_{t+1}}(s) - V_{π_t}(s)] ≥ γ * E_{s∼ρ} [ Var_{a∼π_t} [A_μ(s,a)] + E_{a∼π_t} [A_μ(s,a) A_π_t(s,a)] ]`
-
-Empirical validation of this bound and exploration of tighter bounds under specific conditions could be conducted. Investigation into how different prover designs affect the terms in this bound, particularly the variance term `Var_{a∼π_t} [A_μ(s,a)]` and the alignment term `E_{a∼π_t} [A_μ(s,a) A_π_t(s,a)]`, would be valuable.
+   Empirical validation of this bound and exploration of tighter bounds under specific conditions could be conducted. Investigation into how different prover designs affect the terms in this bound, particularly the variance term $\mathbb{V}_{a\sim\pi_t} [A_\mu(s,a)]$ and the alignment term $\mathbb{E}_{a\sim\pi_t} [A_\mu(s,a)A_{\pi_t}(s,a)]$, would be valuable.

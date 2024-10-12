@@ -91,46 +91,44 @@ $$\text{beam}_t = \text{top-k}_{a} \{(s, a, R_{\text{effective}}(s, a)) | s \in 
 
 This implementation attempts to capture the key ideas from "Rewarding Progress: Scaling Automated Process Verifiers for LLM Reasoning". While it may not be an exact replication, it provides a foundation for exploring the concepts of Process Advantage Verifiers and their potential for improving reasoning in LLMs. Further refinement and comparison with the original paper may be necessary to fully realize the potential of this approach
 
-### Missing Add-ons
+### Missing Add-on
 
 1. **Dynamic Prover Updates**:
 
-   Let \(\pi_t\) be the base policy and \(\mu_t\) be the prover policy at training iteration \(t\). The goal is to update \(\mu_t\) dynamically to maintain its complementarity to \(\pi_t\). One approach could be:
+   Let \( \pi_t \) be the base policy and \( \mu_t \) be the prover policy at training iteration \( t \). The goal is to update \( \mu_t \) dynamically to maintain its complementarity to \( \pi_t \). One approach could be:
 
    \[
-   \mu_{t+1} = \arg\max_{\mu} \left[ \mathbb{E}_{s\sim\rho} \mathbb{V}_{a\sim\pi_t} [A_\mu(s,a)] + \lambda \mathbb{E}_{s\sim\rho, a\sim\pi_t} [A_\mu(s,a)A_{\pi_t}(s,a)] \right]
+   \mu_{t+1} = \text{argmax}_\mu \left[ \mathbb{E}_{s \sim \rho} \, \mathbb{V}_{a \sim \pi_t} \left( A_\mu(s,a) \right) + \lambda \, \mathbb{E}_{s \sim \rho, a \sim \pi_t} \left( A_\mu(s,a) A_{\pi_t}(s,a) \right) \right]
    \]
 
-   where \(\lambda\) balances between distinguishability and alignment. This optimization problem could be solved periodically during training to update the prover.
+   Here, \( \lambda \) balances between distinguishability and alignment. This optimization problem could be solved periodically during training to update the prover.
 
 2. **Optimal Prover Design**:
 
    This can be formulated as a two-player game:
 
    \[
-   \min_{\pi} \max_{\mu} \mathcal{L}(\pi, \mu) = \mathbb{E}_{s\sim\rho} [V_\pi(s)] + \alpha \cdot \mathbb{E}_{s\sim\rho} \left[ \mathbb{V}_{a\sim\pi} [A_\mu(s,a)] - \beta \cdot |\mathbb{E}_{a\sim\pi} [A_\mu(s,a)A_\pi(s,a)]| \right]
+   \min_\pi \max_\mu \mathcal{L}(\pi, \mu) = \mathbb{E}_{s \sim \rho} \left[ V_\pi(s) \right] + \alpha \cdot \mathbb{E}_{s \sim \rho} \left[ \mathbb{V}_{a \sim \pi} \left( A_\mu(s,a) \right) - \beta \cdot \left| \mathbb{E}_{a \sim \pi} \left( A_\mu(s,a) A_\pi(s,a) \right) \right| \right]
    \]
 
-   Here, \(\alpha\) and \(\beta\) are hyperparameters. This formulation encourages high performance of \(\pi\) while also promoting a complementary \(\mu\) (high variance of \(A_\mu\) under \(\pi\), with some alignment).
+   Here, \( \alpha \) and \( \beta \) are hyperparameters. This formulation encourages high performance of \( \pi \) while promoting a complementary \( \mu \), balancing variance and alignment.
 
 3. **Rollout-Based Advantage Estimation**:
 
-   Instead of training a PAV, \(A_\mu(s,a)\) could be estimated directly using Monte Carlo rollouts:
+   Instead of training a PAV, \( A_\mu(s,a) \) could be estimated directly using Monte Carlo rollouts:
 
    \[
    \hat{A}_\mu(s,a) = \frac{1}{N} \sum_{i=1}^N \left[ R(s,a,\mu_i) - \frac{1}{M} \sum_{j=1}^M R(s,\mu_j) \right]
    \]
 
-   where \(R(s,a,\mu_i)\) is the return from state \(s\), taking action \(a\) and then following prover \(\mu\) for the \(i\)-th rollout, and \(R(s,\mu_j)\) is the return from state \(s\) following \(\mu\) for the \(j\)-th rollout.
+   Where \( R(s,a,\mu_i) \) is the return from state \( s \) after taking action \( a \) and then following prover \( \mu \) for the \( i \)-th rollout. \( R(s,\mu_j) \) is the return from state \( s \) following \( \mu \) for the \( j \)-th rollout.
 
 4. **Theoretical Guarantees**:
 
-   Further investigation of the lower bound on policy improvement from Theorem 3.1 is needed:
+   The lower bound on policy improvement from Theorem 3.1 needs further investigation:
 
    \[
-   \mathbb{E}_{s\sim\rho} [V_{\pi_{t+1}}(s) - V_{\pi_t}(s)] \gtrsim \gamma \cdot \mathbb{E}_{s\sim\rho} \left[ \mathbb{V}_{a\sim\pi_t} [A_\mu(s,a)] + \mathbb{E}_{a\sim\pi_t} [A_\mu(s,a)A_{\pi_t}(s,a)] \right]
+   \mathbb{E}_{s \sim \rho} \left[ V_{\pi_{t+1}}(s) - V_{\pi_t}(s) \right] \gtrsim \gamma \cdot \mathbb{E}_{s \sim \rho} \left[ \mathbb{V}_{a \sim \pi_t} \left( A_\mu(s,a) \right) + \mathbb{E}_{a \sim \pi_t} \left( A_\mu(s,a) A_{\pi_t}(s,a) \right) \right]
    \]
 
-   Empirical validation of this bound and exploration of tighter bounds under specific conditions could be conducted. Exploration into how different prover designs affect the terms in this bound, particularly the variance term \(\mathbb{V}_{a\sim\pi_t} [A_\mu(s,a)]\) and the alignment term \(\mathbb{E}_{a\sim\pi_t} [A_\mu(s,a)A_{\pi_t}(s,a)]\), would be valuable.
-
-This formatting should help the math display correctly in environments where full LaTeX rendering might not be supported. In general, check whether the context supports LaTeX or markdown-style syntax and adjust accordingly by using inline math (`\(expression\)`) and block math (`\[expression\]`) conventions.
+   Empirical validation of this bound and exploring how different prover designs affect the terms in this bound, particularly the variance term \( \mathbb{V}_{a \sim \pi_t} \left( A_\mu(s,a) \right) \) and the alignment term \( \mathbb{E}_{a \sim \pi_t} \left( A_\mu(s,a) A_{\pi_t}(s,a) \right) \), would be valuable.
